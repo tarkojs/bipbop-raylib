@@ -10,6 +10,9 @@
 #include "AI_agent.h"
 
 /*
+
+SET ai_active to false if you want to control the paddle yourself.
+
 TO DO:
 
 1. window --> done, ball --> done, board --> done, bricks --> done
@@ -18,14 +21,15 @@ TO DO:
 
 3. movement of board --> done
 
-4. 1) when brick hit by ball, reduce integrity by one (full integrity is 10) --> done (currently set to 3)
+4. 1) when brick hit by ball, reduce integrity by one (full integrity is 10) --> done (currently set to 3 for testing)
    2) ball bounce according to angles --> done
-   3) scoring mechanism (3 lives) --> done
-   4) timer --> done
+   3) scoring mechanism (full lives is 3) --> done (currently set to 3 lives)
+   4) timer --> done (currently set to 30 seconds)
 
 5. make game smart --> done (please specify the ai_active boolean)
 
 6. report up to 5 pages --> done
+
 */
 
 // compiler flags:
@@ -58,7 +62,7 @@ int main()
 	Bricks bricks;
 	bricks.brick_width = 40;
 	bricks.brick_height = 40;
-	bricks.extraSpace = 10;
+	bricks.extraSpace = 10; // padding
 	bricks.brick [15][15];
 	bricks.integrity [15][15];
 	bricks.brick_cols = GetScreenWidth() / (bricks.brick_width + bricks.extraSpace + 4);
@@ -66,7 +70,8 @@ int main()
     bricks.brick_center = (GetScreenWidth() - bricks.brick_cols * bricks.brick_width - bricks.brick_cols * bricks.extraSpace + bricks.extraSpace) / 4;
 
 	for (int i = 0; i < 15; i++){ // fill an array with brick integrity values
-		for (int j = 0; j < 15; j++){
+		for (int j = 0; j < 15; j++)
+		{
         	bricks.integrity[i][j] = 3; // specify the number of "lives" each brick has
 		}
 	}
@@ -76,11 +81,13 @@ int main()
 	const char* gameOverText = nullptr;
 	const char* time_gameOverText = nullptr;
 	int lives = 3; // number of lives (3 according to the instructions)
+	int score = 0; // initialize the score as 0
 	float ballLife = 30.0f; // how long the player will have to destroy all the bricks before losing
 	bool ai_active = true; // choose whether we want to play ourselves or let the AI play
 
+
 	Timer timer_ball = { 0 };
-	startTimer(&timer_ball, 30.0f);
+	startTimer(&timer_ball, ballLife);
 
 	while (!WindowShouldClose())
 	{
@@ -88,7 +95,7 @@ int main()
 		ball.x += ball.x_speed * GetFrameTime();
 		ball.y += ball.y_speed * GetFrameTime();
 
-		agent.bruteForce(ball.x, ball.y, ball.x_speed, ball.y_speed, b_paddle.x);
+		//agent.bruteForce(ball.x, ball.y, ball.x_speed, ball.y_speed, b_paddle.x); NOT USED, just having it in the main loop works better.
 
 		if (ai_active)
 		{
@@ -141,7 +148,7 @@ int main()
 		// collisions::
 
 
-		if (CheckCollisionCircleRec(Vector2{ ball.x, ball.y }, ball.radius, b_paddle.GetRect()))
+		if (CheckCollisionCircleRec(Vector2{ ball.x, ball.y }, ball.radius, b_paddle.GetRect())) // ball & paddle collision
 		{
 			if (ball.y_speed > 0)
 			{
@@ -152,7 +159,7 @@ int main()
 
 		//bricks.Collide(5, 3, bricks.brick_center, bricks.brick_height, bricks.brick_width, bricks.x, bricks.y, ball.x, ball.y, ball.radius, bricks.extraSpace);
 
-		for(int i = 0; i < bricks.brick_cols; i++)
+		for(int i = 0; i < bricks.brick_cols; i++) // ball & bricks collision
     	{
 			for(int j = 0; j < bricks.brick_rows; j++)
 			{
@@ -160,30 +167,40 @@ int main()
 				{
 					int x = bricks.brick_center + (bricks.extraSpace * 2) + i * bricks.brick_width + i * bricks.extraSpace;
 					int y = bricks.extraSpace * 2 + j * bricks.brick_height + j * bricks.extraSpace;
-					if(CheckCollisionCircleRec(Vector2{ (float) ball.x, (float) ball.y }, (float) ball.radius, {(float) x, (float) y, (float) bricks.brick_width, (float) bricks.brick_height}))
+					if(CheckCollisionCircleRec(Vector2{ (float) ball.x, (float) ball.y }, (float) ball.radius, 
+														{(float) x, (float) y, (float) bricks.brick_width, (float) bricks.brick_height}))
 					{
-						if (ball.y_speed < 0)
+						if (ball.y_speed < 0 && ball.x_speed < 0)
+						{
+							ball.y_speed *= -1.0f;
+							ball.x_speed *= 1.0f; // *1.0f just in case
+							bricks.integrity[i][j] -= 1;
+						}
+						else if (ball.y_speed < 0 && ball.x_speed > 0)
 						{
 							ball.y_speed *= -1.0f;
 							ball.x_speed *= 1.0f;
 							bricks.integrity[i][j] -= 1;
 						}
-						else{
-							ball.y_speed *= -1.0f;
-							ball.x_speed *= 1.0f;
-							bricks.integrity[i][j] -= 1; // does not work with two if statements, has to have an else (perhaps an elif)
-														// however it is not 100% consistent for whatever reason.
+						else if (ball.y_speed > 0 && ball.x_speed < 0)
+						{
+							ball.y_speed *= 1.0f;
+							ball.x_speed *= -1.0f;
+							bricks.integrity[i][j] -= 1;
 						}
-
-						if (bricks.integrity[i][j] == 0){
+						else if (ball.y_speed > 0 && ball.x_speed > 0)
+						{
+							ball.y_speed *= 1.0f;
+							ball.x_speed *= -1.0f;
+							bricks.integrity[i][j] -= 1;
+						}
+		
+						if (bricks.integrity[i][j] == 0)
+						{
 							bricks.brick[i][j] = 0;
+							score += 1; // add to the score if a brick is destroyed
 						}
-
-
-						//bricks.integrity[i][j] -= 1;
-
                 	}	
-
             	}
      		}
 		}
@@ -207,8 +224,9 @@ int main()
 			ball.y = GetScreenHeight() / 2;
 			ball.x_speed = 250;
 			ball.y_speed = 250;
-			gameOverText = nullptr;
 			stopTimer(&timer_ball);
+			startTimer(&timer_ball, ballLife);
+			gameOverText = nullptr;
 		}
 
 		if (time_gameOverText && IsKeyPressed(KEY_R))
@@ -218,7 +236,7 @@ int main()
 			ball.x_speed = 250;
 			ball.y_speed = 250;
 			stopTimer(&timer_ball);
-			startTimer(&timer_ball, 30.0f);
+			startTimer(&timer_ball, ballLife);
 			time_gameOverText = nullptr;
 		}
 
@@ -237,6 +255,8 @@ int main()
 				DrawText(gameOverText, GetScreenWidth() / 2 - textWidth / 2, GetScreenHeight() / 2 - 30, 30, RED);
 				ball.x_speed = 0, ball.y_speed = 0;
 				lives = 3;
+				CloseWindow(); // remove this and the next statement to see the game over text, otherwise the game will automatically restart
+				main();
 			}
 
 			if (time_gameOverText)
@@ -245,10 +265,13 @@ int main()
 				DrawText(time_gameOverText, GetScreenWidth() / 2 - textWidth / 2, GetScreenHeight() / 2 - 30, 30, RED);
 				ball.x_speed = 0, ball.y_speed = 0;
 				lives = 3;
+				CloseWindow(); // remove this and the next statement to see the game over text, otherwise the game will automatically restart
+				main();
 			}
 
-			DrawText(TextFormat("Lives: %d", lives), 10, 10, 30, RED);
-			DrawText(TextFormat("Total Time (s): %d", 30), 10, 40, 17, RED);
+			DrawText(TextFormat("Score: %d", score), 10, 450, 30, RED);
+			DrawText(TextFormat("Lives: %d", lives), 10, 420, 30, RED);
+			DrawText(TextFormat("Total Time (s): %d", 30), 10, 400, 20, RED);
 		
 
 		EndDrawing();
